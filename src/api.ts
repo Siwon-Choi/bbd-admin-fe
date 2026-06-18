@@ -24,6 +24,10 @@ export async function getSession(): Promise<Session> {
   return request<Session>("/api/session/me");
 }
 
+export async function getAccessToken(): Promise<string> {
+  return requestText("/api/auth/token");
+}
+
 export async function searchUsers(search: string): Promise<KeycloakUserSummary[]> {
   const query = new URLSearchParams();
   if (search.trim()) {
@@ -90,6 +94,32 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+async function requestText(path: string, init?: RequestInit): Promise<string> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers: {
+      ...(init?.headers ?? {})
+    },
+    ...init
+  });
+
+  if (!response.ok) {
+    let message = response.statusText;
+    try {
+      message = await response.text();
+    } catch {
+      // Keep the generic error.
+    }
+    throw {
+      status: response.status,
+      code: "HTTP_ERROR",
+      message
+    } satisfies ApiError;
+  }
+
+  return response.text();
 }
 
 function cleanPayload(payload: UserPayload) {

@@ -138,6 +138,27 @@ select:focus {
   font-size: 13px;
 }
 
+.access-denied-panel {
+  width: min(560px, 100%);
+}
+
+.access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.token-box {
+  min-height: 160px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px;
+  color: #0f172a;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 .session {
   display: flex;
   align-items: center;

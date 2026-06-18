@@ -2,6 +2,7 @@ import { FormEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import {
   createUser,
   deactivateUser,
+  getAccessToken,
   getSession,
   getUser,
   login,
@@ -76,6 +77,7 @@ export default function App() {
   const [form, setForm] = useState<UserPayload>(() => blankPayload());
   const [search, setSearch] = useState("");
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [accessToken, setAccessToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -98,12 +100,12 @@ export default function App() {
     setBusy(true);
     try {
       const currentSession = await getSession();
-      if (currentSession.authenticated && !currentSession.admin) {
-        setSession(null);
-        rejectNonAdmin();
-        return;
-      }
       setSession(currentSession);
+      if (currentSession.authenticated && !currentSession.admin) {
+        setUsers([]);
+        setSelectedId(null);
+        setDetail(null);
+      }
       setError("");
     } catch (caught) {
       setSession(null);
@@ -222,15 +224,9 @@ export default function App() {
   function handleFailure(caught: unknown) {
     if (isAdminDenied(caught)) {
       setError(ADMIN_DENIED_MESSAGE);
-      rejectNonAdmin();
       return;
     }
     setError(errorMessage(caught));
-  }
-
-  function rejectNonAdmin() {
-    notifyAdminDenied();
-    logout();
   }
 
   function notifyAdminDenied() {
@@ -257,6 +253,19 @@ export default function App() {
     return true;
   }
 
+  async function loadAccessToken() {
+    setBusy(true);
+    setError("");
+    setAccessToken("");
+    try {
+      setAccessToken(await getAccessToken());
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!session || !session.authenticated) {
     return (
       <main className="login-shell">
@@ -271,6 +280,35 @@ export default function App() {
           </button>
           {error && <p className="inline-error">{error}</p>}
           {busy && !error && <p className="muted">세션 확인 중</p>}
+        </section>
+      </main>
+    );
+  }
+
+  if (!session.admin) {
+    return (
+      <main className="login-shell">
+        <section className="login-panel access-denied-panel">
+          <div>
+            <p className="eyebrow">BBD Admin</p>
+            <h1>권한이 없습니다</h1>
+            <p className="muted">{session.name || session.username || "current user"}</p>
+          </div>
+
+          {error && <p className="inline-error">{error}</p>}
+
+          <div className="access-actions">
+            <button disabled={busy} type="button" onClick={() => void loadAccessToken()}>
+              Access token 보기
+            </button>
+            <button className="primary" type="button" onClick={logout}>
+              로그아웃
+            </button>
+          </div>
+
+          {accessToken && (
+            <textarea className="token-box" readOnly value={accessToken} />
+          )}
         </section>
       </main>
     );

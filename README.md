@@ -36,7 +36,7 @@ The login button sends the browser to:
 
 Spring Security handles the Keycloak authorization code flow in `bbd-admin-be`, then redirects back to this app. After that, this app calls backend APIs with `credentials: "include"` so the session cookie is sent.
 
-If the backend redirects back with `auth=admin_required`, the app alerts `관리자 권한이 없습니다. 재 로그인하세요.` and sends the browser through logout before showing the login page again.
+Temporary mode keeps a non-admin login session but renders only the access-denied view, logout, and access-token inspection. Final mode can be enabled in the backend with `HDP_ADMIN_DENIED_LOGIN_ACTION=KEYCLOAK_LOGOUT` and `HDP_EXPOSE_ACCESS_TOKEN=false`.
 
 ## Build
 
