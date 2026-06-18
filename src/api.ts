@@ -30,7 +30,7 @@ export async function searchUsers(search: string): Promise<KeycloakUserSummary[]
     query.set("search", search.trim());
   }
   query.set("first", "0");
-  query.set("max", "20");
+  query.set("max", "100");
   return request<KeycloakUserSummary[]>(`/api/admin/users?${query.toString()}`);
 }
 

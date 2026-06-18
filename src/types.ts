@@ -55,6 +55,7 @@ export type ScimUserSummary = {
   userName: string;
   displayName: string | null;
   employeeNumber: string | null;
+  position: string | null;
   role: string | null;
   tenancyType: string | null;
   tenancyName: string | null;
