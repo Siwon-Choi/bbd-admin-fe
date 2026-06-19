@@ -23,6 +23,8 @@ import "./styles.css";
 
 const ADMIN_DENIED_MESSAGE = "관리자 권한이 없습니다. 재 로그인하세요.";
 
+const LOGIN_FAILED_MESSAGE = "로그인 처리가 완료되지 않았습니다. 다시 로그인하세요.";
+
 const roles: UserRole[] = [
   "ADMIN",
   "HQ_MANAGER",
@@ -239,11 +241,16 @@ export default function App() {
 
   function consumeLoginError() {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("auth") !== "admin_required") {
+    const auth = params.get("auth");
+    if (auth !== "admin_required" && auth !== "login_failed") {
       return false;
     }
 
-    notifyAdminDenied();
+    if (auth === "admin_required") {
+      notifyAdminDenied();
+    } else {
+      setError(LOGIN_FAILED_MESSAGE);
+    }
     params.delete("auth");
     const nextSearch = params.toString();
     const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${

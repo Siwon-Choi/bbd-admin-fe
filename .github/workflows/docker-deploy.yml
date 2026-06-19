@@ -1,0 +1,52 @@
+name: Build and deploy admin frontend
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/bbd-admin-fe
+
+jobs:
+  build-push-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" \
+            | docker login \
+                --username "${{ secrets.DOCKERHUB_USERNAME }}" \
+                --password-stdin
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA::12}"
+          docker build \
+            --tag "${IMAGE_NAME}:latest" \
+            --tag "${IMAGE_NAME}:${SHORT_SHA}" \
+            .
+          docker push "${IMAGE_NAME}:latest"
+          docker push "${IMAGE_NAME}:${SHORT_SHA}"
+
+      - name: Deploy frontend on EC2
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          ssh -i ~/.ssh/id_rsa \
+            -o StrictHostKeyChecking=no \
+            "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" \
+            "cd '${{ secrets.EC2_DEPLOY_DIR }}' \
+              && docker compose -f docker-compose.admin.yml pull admin-fe \
+              && docker compose -f docker-compose.admin.yml up -d admin-fe \
+              && docker image prune -f"

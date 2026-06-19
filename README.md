@@ -26,6 +26,8 @@ Default backend URL:
 VITE_BBD_ADMIN_API_BASE=http://localhost:8090
 ```
 
+In production Docker builds, omit `VITE_BBD_ADMIN_API_BASE` so the app calls the same origin through nginx, for example `/api/session/me`.
+
 ## Login Flow
 
 The login button sends the browser to:
@@ -42,4 +44,34 @@ Temporary mode keeps a non-admin login session but renders only the access-denie
 
 ```powershell
 npm run build
+```
+
+## Docker Deployment
+
+Build locally:
+
+```powershell
+docker build -t bbd-admin-fe:local .
+```
+
+The image serves the React build with nginx and proxies these paths to `admin-be:8090`:
+
+```text
+/api/**
+/oauth2/**
+/login/**
+/logout
+```
+
+On EC2, use the compose template from `bbd-admin-be/deploy/docker-compose.admin.yml`. The frontend image is controlled by `ADMIN_FE_IMAGE` in the compose `.env` file.
+
+GitHub Actions expects these repository secrets:
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+EC2_HOST
+EC2_USER
+EC2_SSH_KEY
+EC2_DEPLOY_DIR
 ```
