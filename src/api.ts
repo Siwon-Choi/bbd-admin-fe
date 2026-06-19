@@ -128,9 +128,8 @@ async function requestText(path: string, init?: RequestInit): Promise<string> {
 function cleanPayload(payload: UserPayload) {
   return {
     ...payload,
+    employeeNumber: payload.employeeNumber.trim(),
     email: blankToNull(payload.email),
-    firstName: blankToNull(payload.firstName),
-    lastName: blankToNull(payload.lastName),
     displayName: blankToNull(payload.displayName),
     password: blankToNull(payload.password),
     position: blankToNull(payload.position),

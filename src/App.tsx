@@ -52,10 +52,7 @@ type ModalMode = "create" | "edit";
 
 function blankPayload(): UserPayload {
   return {
-    username: "",
     email: "",
-    firstName: "",
-    lastName: "",
     displayName: "",
     password: "",
     temporaryPassword: true,
@@ -181,8 +178,8 @@ export default function App() {
     try {
       const result =
         modalMode === "edit" && selectedId
-          ? await updateUser(selectedId, form)
-          : await createUser(form);
+          ? await updateUser(selectedId, payloadForSubmit(form))
+          : await createUser(payloadForSubmit(form));
 
       setNotice(
         modalMode === "edit"
@@ -347,7 +344,7 @@ export default function App() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="이름, 이메일, username"
+            placeholder="이름, 이메일, 사번"
           />
           <button disabled={busy} type="submit">
             검색
@@ -410,15 +407,15 @@ export default function App() {
               </div>
 
               <dl className="detail-grid">
-                <dt>Username</dt>
+                <dt>Keycloak 로그인 ID</dt>
                 <dd>{detail.keycloak.username}</dd>
                 <dt>사번</dt>
                 <dd>{detail.scim?.employeeNumber ?? employeeNumber(detail.keycloak)}</dd>
-                <dt>직책</dt>
+                <dt>직급</dt>
                 <dd>{detail.scim?.position ?? "-"}</dd>
-                <dt>권한</dt>
+                <dt>역할</dt>
                 <dd>{roleLabel(detail.scim?.role)}</dd>
-                <dt>소속</dt>
+                <dt>소속 유형</dt>
                 <dd>{tenancyLabel(detail.scim?.tenancyType)}</dd>
                 <dt>소속명</dt>
                 <dd>{detail.scim?.tenancyName ?? "-"}</dd>
@@ -458,69 +455,52 @@ export default function App() {
 
               <div className="form-grid">
                 <label>
-                  Username
+                  {fieldLabel("사번 (Keycloak 로그인 ID)", true)}
                   <input
                     required
-                    pattern="[A-Za-z0-9._-]+"
-                    value={form.username}
-                    onChange={(event) => setFormField("username", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  Email
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(event) => setFormField("email", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  이름
-                  <input
-                    value={form.firstName}
-                    onChange={(event) => setFormField("firstName", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  성
-                  <input
-                    value={form.lastName}
-                    onChange={(event) => setFormField("lastName", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  표시 이름
-                  <input
-                    value={form.displayName}
-                    onChange={(event) => setFormField("displayName", event.target.value)}
-                  />
-                </label>
-
-                <label>
-                  사번
-                  <input
-                    required
+                    pattern={"[A-Za-z0-9._\\-]+"}
+                    title="영문, 숫자, 마침표, 밑줄, 하이픈만 입력할 수 있습니다."
+                    placeholder="예: BR001"
                     value={form.employeeNumber}
                     onChange={(event) => setFormField("employeeNumber", event.target.value)}
                   />
                 </label>
 
                 <label>
-                  직책
+                  {fieldLabel("이름", true)}
                   <input
                     required
+                    placeholder="예: 이상장"
+                    value={form.displayName}
+                    onChange={(event) => setFormField("displayName", event.target.value)}
+                  />
+                </label>
+
+                <label>
+                  {fieldLabel("직급", true)}
+                  <input
+                    required
+                    placeholder="예: 점장"
                     value={form.position}
                     onChange={(event) => setFormField("position", event.target.value)}
                   />
                 </label>
 
                 <label>
-                  비밀번호
+                  이메일
                   <input
+                    type="email"
+                    placeholder="예: staff@bbd.com"
+                    value={form.email}
+                    onChange={(event) => setFormField("email", event.target.value)}
+                  />
+                </label>
+
+                <label>
+                  {fieldLabel("비밀번호", modalMode === "create")}
+                  <input
+                    required={modalMode === "create"}
+                    placeholder={modalMode === "create" ? "예: 초기 비밀번호" : "변경할 때만 입력"}
                     type="password"
                     value={form.password}
                     onChange={(event) => setFormField("password", event.target.value)}
@@ -528,8 +508,9 @@ export default function App() {
                 </label>
 
                 <label>
-                  권한
+                  {fieldLabel("역할", true)}
                   <select
+                    required
                     value={form.role}
                     onChange={(event) => setFormField("role", event.target.value as UserRole)}
                   >
@@ -542,8 +523,9 @@ export default function App() {
                 </label>
 
                 <label>
-                  소속
+                  {fieldLabel("소속 유형", true)}
                   <select
+                    required
                     value={form.tenancyType}
                     onChange={(event) =>
                       setFormField("tenancyType", event.target.value as TenancyType)
@@ -558,31 +540,27 @@ export default function App() {
                 </label>
 
                 <label className="span-2">
-                  소속명
+                  {fieldLabel("소속명", true)}
                   <input
                     required
+                    placeholder={form.tenancyType === "HQ" ? "예: 본사" : "예: 강남 1지점"}
                     value={form.tenancyName}
                     onChange={(event) => setFormField("tenancyName", event.target.value)}
                   />
                 </label>
 
-                <div className="checks span-2">
-                  <label>
-                    <input
-                      checked={form.enabled}
-                      type="checkbox"
-                      onChange={(event) => setFormField("enabled", event.target.checked)}
-                    />
-                    Keycloak 활성
-                  </label>
-                  <label>
-                    <input
-                      checked={form.emailVerified}
-                      type="checkbox"
-                      onChange={(event) => setFormField("emailVerified", event.target.checked)}
-                    />
-                    이메일 인증
-                  </label>
+                <label>
+                  계정 상태
+                  <select
+                    value={accountStatus(form)}
+                    onChange={(event) => setAccountStatus(event.target.value as AccountStatus)}
+                  >
+                    <option value="ACTIVE">활성</option>
+                    <option value="SUSPENDED">비활성</option>
+                  </select>
+                </label>
+
+                <div className="checks">
                   <label>
                     <input
                       checked={form.temporaryPassword}
@@ -592,14 +570,6 @@ export default function App() {
                       }
                     />
                     임시 비밀번호
-                  </label>
-                  <label>
-                    <input
-                      checked={form.sourceActive}
-                      type="checkbox"
-                      onChange={(event) => setFormField("sourceActive", event.target.checked)}
-                    />
-                    SCIM 활성
                   </label>
                 </div>
               </div>
@@ -628,41 +598,85 @@ export default function App() {
   function setFormField<K extends keyof UserPayload>(key: K, value: UserPayload[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  function setAccountStatus(status: AccountStatus) {
+    const active = status === "ACTIVE";
+    setForm((current) => ({ ...current, enabled: active, sourceActive: active }));
+  }
+}
+
+type AccountStatus = "ACTIVE" | "SUSPENDED";
+
+function payloadForSubmit(payload: UserPayload): UserPayload {
+  const employeeNumber = payload.employeeNumber.trim();
+  const displayName = payload.displayName.trim();
+
+  return {
+    ...payload,
+    employeeNumber,
+    displayName
+  };
+}
+
+function accountStatus(payload: UserPayload): AccountStatus {
+  return payload.enabled === false || payload.sourceActive === false ? "SUSPENDED" : "ACTIVE";
 }
 
 function payloadFromDetail(detail: AdminUserDetail): UserPayload {
   const attrs = detail.keycloak.attributes ?? {};
   return {
-    username: detail.keycloak.username ?? "",
     email: detail.keycloak.email ?? "",
-    firstName: detail.keycloak.firstName ?? "",
-    lastName: detail.keycloak.lastName ?? "",
-    displayName: detail.scim?.displayName ?? "",
+    displayName:
+      detail.scim?.displayName ||
+      firstAttr(attrs.displayName) ||
+      displayUserName(detail.keycloak),
     password: "",
     temporaryPassword: true,
     enabled: detail.keycloak.enabled !== false,
     emailVerified: detail.keycloak.emailVerified === true,
     employeeNumber:
-      detail.scim?.employeeNumber ?? firstAttr(attrs.employee_number) ?? firstAttr(attrs.employeeNumber),
-    position: detail.scim?.position ?? firstAttr(attrs.position),
-    role: roleValue(detail.scim?.role ?? firstAttr(attrs.role) ?? firstAttr(attrs.erpRole)),
+      detail.scim?.employeeNumber ||
+      firstAttr(attrs.employee_number) ||
+      firstAttr(attrs.employeeNumber) ||
+      detail.keycloak.username,
+    position: detail.scim?.position || firstAttr(attrs.position),
+    role: roleValue(detail.scim?.role || firstAttr(attrs.role) || firstAttr(attrs.erpRole)),
     tenancyType: tenancyValue(
-      detail.scim?.tenancyType ?? firstAttr(attrs.tenancy_type) ?? firstAttr(attrs.tenancyType)
+      detail.scim?.tenancyType || firstAttr(attrs.tenancy_type) || firstAttr(attrs.tenancyType)
     ),
     tenancyName:
-      detail.scim?.tenancyName ?? firstAttr(attrs.tenancy_name) ?? firstAttr(attrs.tenancyName),
+      detail.scim?.tenancyName || firstAttr(attrs.tenancy_name) || firstAttr(attrs.tenancyName),
     sourceActive: detail.scim?.active !== false,
     attributes: {}
   };
 }
 
 function displayUserName(user: KeycloakUserSummary) {
+  const attributeDisplayName = firstAttr(user.attributes?.displayName);
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  return fullName || user.username;
+  return attributeDisplayName || fullName || user.username;
 }
 
 function employeeNumber(user: KeycloakUserSummary) {
-  return firstAttr(user.attributes?.employee_number) || firstAttr(user.attributes?.employeeNumber) || "-";
+  return (
+    firstAttr(user.attributes?.employee_number) ||
+    firstAttr(user.attributes?.employeeNumber) ||
+    user.username ||
+    "-"
+  );
+}
+
+function fieldLabel(text: string, required = false) {
+  return (
+    <span className="field-label">
+      {text}
+      {required && (
+        <span aria-label="필수" className="required-mark">
+          *
+        </span>
+      )}
+    </span>
+  );
 }
 
 function avatarText(detail: AdminUserDetail) {
@@ -709,5 +723,9 @@ function errorMessage(caught: unknown) {
   }
 
   const apiError = caught as Partial<ApiError>;
+  if (apiError.details?.length) {
+    return `${apiError.message ?? "요청 처리에 실패했습니다."}\n${apiError.details.join("\n")}`;
+  }
+
   return apiError.message ?? "요청 처리에 실패했습니다.";
 }

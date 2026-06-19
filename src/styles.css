@@ -64,6 +64,10 @@ select {
   padding: 0 10px;
 }
 
+input::placeholder {
+  color: #94a3b8;
+}
+
 input:focus,
 select:focus {
   border-color: #2563eb;
@@ -136,6 +140,7 @@ select:focus {
   color: #991b1b;
   padding: 10px 12px;
   font-size: 13px;
+  white-space: pre-line;
 }
 
 .access-denied-panel {
@@ -189,6 +194,7 @@ select:focus {
   margin-bottom: 16px;
   border-radius: 8px;
   padding: 12px 14px;
+  white-space: pre-line;
 }
 
 .banner.success {
@@ -448,9 +454,21 @@ label {
   font-weight: 700;
 }
 
+.field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 16px;
+}
+
+.required-mark {
+  color: #dc2626;
+  font-weight: 800;
+}
+
 .checks {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
 }
 

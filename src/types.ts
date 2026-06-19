@@ -20,10 +20,7 @@ export type Session = {
 };
 
 export type UserPayload = {
-  username: string;
   email: string;
-  firstName: string;
-  lastName: string;
   displayName: string;
   password: string;
   temporaryPassword: boolean;
