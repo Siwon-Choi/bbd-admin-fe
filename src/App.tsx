@@ -1,5 +1,6 @@
 import { FormEvent, MouseEvent, useEffect, useRef, useState } from "react";
 import {
+  createUsersBulk,
   createUser,
   deactivateUser,
   getAccessToken,
@@ -50,6 +51,10 @@ const tenancyLabels: Record<TenancyType, string> = {
 
 type ModalMode = "create" | "edit";
 
+const bulkSample = `사번,이름,직급,비밀번호,역할,소속 유형,소속명,계정 상태,임시 비밀번호
+BR001,이상장,점장,Temp1234,지점 직원,지점,강남지점,활성,true
+HQ001,김본사,과장,Temp1234,본사 직원,본사,성수본사,활성,true`;
+
 function blankPayload(): UserPayload {
   return {
     email: "",
@@ -76,10 +81,13 @@ export default function App() {
   const [form, setForm] = useState<UserPayload>(() => blankPayload());
   const [search, setSearch] = useState("");
   const [modalMode, setModalMode] = useState<ModalMode | null>(null);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkText, setBulkText] = useState(bulkSample);
   const [accessToken, setAccessToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [modalError, setModalError] = useState("");
   const adminDeniedAlerted = useRef(false);
 
   useEffect(() => {
@@ -145,9 +153,20 @@ export default function App() {
 
   function openCreateModal() {
     setForm(blankPayload());
+    setBulkModalOpen(false);
     setModalMode("create");
     setNotice("");
     setError("");
+    setModalError("");
+  }
+
+  function openBulkModal() {
+    setBulkText(bulkSample);
+    setModalMode(null);
+    setBulkModalOpen(true);
+    setNotice("");
+    setError("");
+    setModalError("");
   }
 
   function openEditModal() {
@@ -158,10 +177,13 @@ export default function App() {
     setModalMode("edit");
     setNotice("");
     setError("");
+    setModalError("");
   }
 
   function closeModal() {
     setModalMode(null);
+    setBulkModalOpen(false);
+    setModalError("");
     if (detail) {
       setForm(payloadFromDetail(detail));
     } else {
@@ -173,13 +195,19 @@ export default function App() {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setModalError("");
     setNotice("");
 
     try {
+      const payload = payloadForSubmit(form);
+      if (modalMode !== "edit" || payload.password.trim()) {
+        assertPasswordPolicy(payload.password);
+      }
+
       const result =
         modalMode === "edit" && selectedId
-          ? await updateUser(selectedId, payloadForSubmit(form))
-          : await createUser(payloadForSubmit(form));
+          ? await updateUser(selectedId, payload)
+          : await createUser(payload);
 
       setNotice(
         modalMode === "edit"
@@ -191,7 +219,31 @@ export default function App() {
       await loadUsers();
       await selectUser(result.keycloakUserId);
     } catch (caught) {
-      handleFailure(caught);
+      setModalError(isAdminDenied(caught) ? ADMIN_DENIED_MESSAGE : errorMessage(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitBulk(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    setModalError("");
+    setNotice("");
+
+    try {
+      const parsedUsers = parseBulkUsers(bulkText);
+      const result = await createUsersBulk(parsedUsers);
+      setNotice(`${result.requested}명 직원을 대량 추가했습니다.`);
+      setBulkModalOpen(false);
+      await loadUsers();
+      if (result.users[0]?.keycloakUserId) {
+        setSelectedId(result.users[0].keycloakUserId);
+        await selectUser(result.users[0].keycloakUserId);
+      }
+    } catch (caught) {
+      setModalError(isAdminDenied(caught) ? ADMIN_DENIED_MESSAGE : errorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -350,9 +402,14 @@ export default function App() {
             검색
           </button>
         </form>
-        <button className="primary" type="button" onClick={openCreateModal}>
-          직원 추가
-        </button>
+        <div className="toolbar-actions">
+          <button type="button" onClick={openBulkModal}>
+            대량 추가
+          </button>
+          <button className="primary" type="button" onClick={openCreateModal}>
+            직원 추가
+          </button>
+        </div>
       </section>
 
       {(notice || error) && (
@@ -452,6 +509,8 @@ export default function App() {
                   닫기
                 </button>
               </div>
+
+              {modalError && <section className="modal-message error">{modalError}</section>}
 
               <div className="form-grid">
                 <label>
@@ -586,6 +645,45 @@ export default function App() {
           </section>
         </div>
       )}
+
+      {bulkModalOpen && (
+        <div className="modal-backdrop" onMouseDown={handleBackdropMouseDown}>
+          <section aria-modal="true" className="modal" role="dialog">
+            <form className="modal-form" onSubmit={submitBulk}>
+              <div className="modal-heading">
+                <h2>직원 대량 추가</h2>
+                <button aria-label="닫기" type="button" onClick={closeModal}>
+                  닫기
+                </button>
+              </div>
+
+              {modalError && <section className="modal-message error">{modalError}</section>}
+
+              <div className="form-grid">
+                <label className="span-2">
+                  {fieldLabel("직원 목록", true)}
+                  <textarea
+                    className="bulk-textarea"
+                    required
+                    spellCheck={false}
+                    value={bulkText}
+                    onChange={(event) => setBulkText(event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="modal-actions">
+                <button disabled={busy} type="button" onClick={closeModal}>
+                  취소
+                </button>
+                <button className="primary" disabled={busy} type="submit">
+                  대량 추가
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 
@@ -601,7 +699,7 @@ export default function App() {
 
   function setAccountStatus(status: AccountStatus) {
     const active = status === "ACTIVE";
-    setForm((current) => ({ ...current, enabled: active, sourceActive: active }));
+    setForm((current) => ({ ...current, enabled: active }));
   }
 }
 
@@ -619,7 +717,7 @@ function payloadForSubmit(payload: UserPayload): UserPayload {
 }
 
 function accountStatus(payload: UserPayload): AccountStatus {
-  return payload.enabled === false || payload.sourceActive === false ? "SUSPENDED" : "ACTIVE";
+  return payload.enabled === false ? "SUSPENDED" : "ACTIVE";
 }
 
 function payloadFromDetail(detail: AdminUserDetail): UserPayload {
@@ -712,6 +810,181 @@ function tenancyValue(value: string | null | undefined): TenancyType {
   return tenancyTypes.includes(value as TenancyType) ? (value as TenancyType) : "HQ";
 }
 
+function parseBulkUsers(text: string): UserPayload[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) {
+    throw new Error("대량 추가할 직원 목록을 입력하세요.");
+  }
+
+  const dataLines = isBulkHeader(lines[0]) ? lines.slice(1) : lines;
+  if (!dataLines.length) {
+    throw new Error("헤더 외에 직원 데이터가 없습니다.");
+  }
+
+  const users = dataLines.map((line, index) => {
+    const columns = parseCsvLine(line).map((column) => column.trim());
+    if (columns.length !== 9) {
+      throw new Error(
+        `${index + 1}번째 데이터 줄의 컬럼 수가 맞지 않습니다. 9개 컬럼이 필요합니다.`
+      );
+    }
+
+    const [
+      employeeNumber,
+      displayName,
+      position,
+      password,
+      role,
+      tenancyType,
+      tenancyName,
+      accountStatusValue,
+      temporaryPasswordValue
+    ] = columns;
+
+    const requiredValues = { employeeNumber, displayName, position, password, role, tenancyType, tenancyName };
+    Object.entries(requiredValues).forEach(([key, value]) => {
+      if (!value.trim()) {
+        throw new Error(`${index + 1}번째 데이터 줄의 ${key} 값이 비어 있습니다.`);
+      }
+    });
+    if (!/^[A-Za-z0-9._-]+$/.test(employeeNumber)) {
+      throw new Error(
+        `${index + 1}번째 데이터 줄의 사번은 영문, 숫자, 마침표, 밑줄, 하이픈만 입력할 수 있습니다.`
+      );
+    }
+    assertPasswordPolicy(password, `${index + 1}번째 데이터 줄의 비밀번호`);
+
+    return {
+      email: "",
+      displayName,
+      password,
+      temporaryPassword: booleanValue(temporaryPasswordValue),
+      enabled: accountStatusFromInput(accountStatusValue) === "ACTIVE",
+      emailVerified: false,
+      employeeNumber,
+      position,
+      role: roleValueFromInput(role),
+      tenancyType: tenancyValueFromInput(tenancyType),
+      tenancyName,
+      sourceActive: true,
+      attributes: {}
+    } satisfies UserPayload;
+  });
+
+  const employeeNumbers = new Set<string>();
+  const duplicates = new Set<string>();
+  users.forEach((user) => {
+    if (employeeNumbers.has(user.employeeNumber)) {
+      duplicates.add(user.employeeNumber);
+    }
+    employeeNumbers.add(user.employeeNumber);
+  });
+  if (duplicates.size) {
+    throw new Error(`중복 사번이 있습니다: ${Array.from(duplicates).join(", ")}`);
+  }
+
+  return users;
+}
+
+function parseCsvLine(line: string) {
+  const values: string[] = [];
+  let current = "";
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index++;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      values.push(current);
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+
+  values.push(current);
+  return values;
+}
+
+function isBulkHeader(line: string) {
+  return line.includes("사번") || line.toLowerCase().includes("employeenumber");
+}
+
+function roleValueFromInput(value: string): UserRole {
+  const normalized = value.trim();
+  const matched = roles.find((role) => role === normalized || roleLabels[role] === normalized);
+  if (!matched) {
+    throw new Error(`역할 값이 올바르지 않습니다: ${value}`);
+  }
+  return matched;
+}
+
+function tenancyValueFromInput(value: string): TenancyType {
+  const normalized = value.trim();
+  const matched = tenancyTypes.find(
+    (type) => type === normalized || tenancyLabels[type] === normalized
+  );
+  if (!matched) {
+    throw new Error(`소속 유형 값이 올바르지 않습니다: ${value}`);
+  }
+  return matched;
+}
+
+function accountStatusFromInput(value: string): AccountStatus {
+  const normalized = value.trim().toUpperCase();
+  if (["활성", "ACTIVE", "TRUE", "Y", "YES"].includes(normalized)) {
+    return "ACTIVE";
+  }
+  if (["비활성", "SUSPENDED", "INACTIVE", "FALSE", "N", "NO"].includes(normalized)) {
+    return "SUSPENDED";
+  }
+  throw new Error(`계정 상태 값이 올바르지 않습니다: ${value}`);
+}
+
+function booleanValue(value: string) {
+  const normalized = value.trim().toUpperCase();
+  if (["TRUE", "Y", "YES", "1", "임시", "예"].includes(normalized)) {
+    return true;
+  }
+  if (["FALSE", "N", "NO", "0", "아니오"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`임시 비밀번호 값이 올바르지 않습니다: ${value}`);
+}
+
+function assertPasswordPolicy(password: string, label = "비밀번호") {
+  const trimmed = password.trim();
+  const violations: string[] = [];
+
+  if (trimmed.length < 8) {
+    violations.push("8자 이상");
+  }
+  if (!/[0-9]/.test(trimmed)) {
+    violations.push("숫자 1개 이상");
+  }
+  if (!/[A-Za-z]/.test(trimmed)) {
+    violations.push("영문 1개 이상");
+  }
+
+  if (violations.length) {
+    throw new Error(`${label}는 ${violations.join(", ")} 조건을 만족해야 합니다.`);
+  }
+}
+
 function isAdminDenied(caught: unknown) {
   const apiError = caught as Partial<ApiError>;
   return apiError.status === 403 || apiError.code === "ADMIN_ROLE_REQUIRED";
@@ -721,11 +994,55 @@ function errorMessage(caught: unknown) {
   if (caught instanceof TypeError) {
     return "백엔드 요청에 실패했습니다. VITE_BBD_ADMIN_API_BASE와 FRONTEND_ORIGIN을 확인하세요.";
   }
+  if (caught instanceof Error) {
+    return caught.message;
+  }
 
   const apiError = caught as Partial<ApiError>;
+  const passwordMessage = keycloakPasswordMessage(apiError.message);
+  if (passwordMessage) {
+    return passwordMessage;
+  }
+
   if (apiError.details?.length) {
     return `${apiError.message ?? "요청 처리에 실패했습니다."}\n${apiError.details.join("\n")}`;
   }
 
   return apiError.message ?? "요청 처리에 실패했습니다.";
+}
+
+function keycloakPasswordMessage(message: string | undefined) {
+  if (!message) {
+    return "";
+  }
+
+  if (
+    message.includes("invalidPasswordHistoryMessage") ||
+    message.includes("must not be equal to any of last")
+  ) {
+    return "최근 사용한 비밀번호는 다시 사용할 수 없습니다. 다른 비밀번호를 입력하세요.";
+  }
+  if (
+    message.includes("invalidPasswordMinLengthMessage") ||
+    message.includes("minimum length") ||
+    message.includes("length")
+  ) {
+    return "비밀번호는 8자 이상이어야 합니다.";
+  }
+  if (
+    message.includes("invalidPasswordMinDigitsMessage") ||
+    message.includes("digits") ||
+    message.includes("digit")
+  ) {
+    return "비밀번호에는 숫자가 1개 이상 포함되어야 합니다.";
+  }
+  if (
+    message.includes("invalidPasswordRegexPatternMessage") ||
+    message.includes("regular expression") ||
+    message.includes("regex")
+  ) {
+    return "비밀번호에는 영문자가 1개 이상 포함되어야 합니다.";
+  }
+
+  return "";
 }

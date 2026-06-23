@@ -72,6 +72,12 @@ export type ProvisionedUserResponse = {
   result: string;
 };
 
+export type BulkProvisionedUsersResponse = {
+  requested: number;
+  users: ProvisionedUserResponse[];
+  result: string;
+};
+
 export type ApiError = {
   status: number;
   code: string;

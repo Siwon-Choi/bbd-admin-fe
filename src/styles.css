@@ -190,6 +190,13 @@ select:focus {
   gap: 8px;
 }
 
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .banner {
   margin-bottom: 16px;
   border-radius: 8px;
@@ -435,6 +442,21 @@ select:focus {
   font-size: 18px;
 }
 
+.modal-message {
+  margin: 14px 16px 0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.modal-message.error {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #991b1b;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -488,6 +510,13 @@ label {
   padding: 0;
 }
 
+.bulk-textarea {
+  min-height: 320px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  line-height: 1.55;
+}
+
 .modal-actions {
   border-top: 1px solid #e5eaf0;
   padding: 14px 16px;
@@ -515,6 +544,7 @@ label {
   .topbar,
   .toolbar,
   .search,
+  .toolbar-actions,
   .identity,
   .form-grid,
   .checks {

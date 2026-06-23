@@ -1,6 +1,7 @@
 import type {
   AdminUserDetail,
   ApiError,
+  BulkProvisionedUsersResponse,
   KeycloakUserSummary,
   ProvisionedUserResponse,
   Session,
@@ -49,6 +50,15 @@ export async function createUser(payload: UserPayload): Promise<ProvisionedUserR
   return request<ProvisionedUserResponse>("/api/admin/users", {
     method: "POST",
     body: JSON.stringify(cleanPayload(payload))
+  });
+}
+
+export async function createUsersBulk(
+  users: UserPayload[]
+): Promise<BulkProvisionedUsersResponse> {
+  return request<BulkProvisionedUsersResponse>("/api/admin/users/bulk", {
+    method: "POST",
+    body: JSON.stringify({ users: users.map(cleanPayload) })
   });
 }
 
